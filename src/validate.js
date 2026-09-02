@@ -22,6 +22,9 @@ export const RESERVED_NAMES = [
 
 export const MAX_AFFIX_LENGTH = 100;
 
+/** Digits of padding beyond which the numbering stops meaning anything. */
+export const MAX_PAD = 20;
+
 const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/;
 const NON_ASCII = /[^\u0020-\u007E]/;
 
@@ -159,8 +162,8 @@ export function validateNumbering({ start, step, pad }) {
       errors.push({
         message: '--pad must be a positive integer (or omitted for automatic padding).',
       });
-    } else if (pad > 20) {
-      errors.push({ message: '--pad is unreasonably large (max 20).' });
+    } else if (pad > MAX_PAD) {
+      errors.push({ message: `--pad is unreasonably large (max ${MAX_PAD}).` });
     }
   }
   return { errors, warnings: [] };

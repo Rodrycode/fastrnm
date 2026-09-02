@@ -101,6 +101,12 @@ fastrnm ./photos --prefix holiday --pad 3
 fastrnm ./photos --undo
 ```
 
+**Don't want to remember the flags:**
+
+```bash
+fastrnm --wizard
+```
+
 **Keep the originals and write the renamed copies elsewhere:**
 
 ```bash
@@ -124,6 +130,64 @@ home-relative (`~/photos`). If you omit it, fastrnm uses the current folder —
 and in that case it **always asks for confirmation, even with `--yes`**.
 Renaming the folder you happen to be standing in is the most expensive mistake
 this tool could make.
+
+### Guided mode
+
+`--wizard` (or `-w`) asks five questions instead of expecting the flags, and
+then runs exactly as if you had typed them. Every answer may be left blank to
+take the value in the hint:
+
+| Option | Description | Default |
+|---|---|---|
+| `-w, --wizard` | Ask for the folder, prefix, padding, separator and order | off |
+
+```console
+$ fastrnm --wizard
+
+  1/5  Which folder holds the files to rename?
+       Leave blank for the current folder (~/photos).
+       > ./photos
+
+  2/5  Which prefix should the renamed files have?
+       Leave blank for none, or type it without a separator (holiday).
+       > holiday
+
+  3/5  How many digits should the numbers have?
+       Leave blank for automatic (3 digits for 100 files), or enter a number.
+       > 3
+
+  4/5  Which separator should go between the parts?
+       Leave blank for "_", or type "none" for no separator.
+       >
+
+  5/5  In which order should the files be numbered?
+       1) created  creation date, oldest first
+       2) name     name, natural order (file2 before file10)
+       3) date     modification date, oldest first
+       4) exif     capture date read from the photo
+       5) size     file size, smallest first
+       Leave blank for created.
+       >
+
+Same run as: fastrnm ./photos --prefix holiday --pad 3 --sort created
+```
+
+From there the run continues down the usual path: the `current → new` table,
+the collision check, the confirmation and the undo log. The wizard only fills
+in options, so nothing it produces is more permissive than typing the flags
+yourself — and the `Same run as` line is the command to type next time.
+
+A few details worth knowing:
+
+| | |
+|---|---|
+| **Blank keeps what you already have** | Flags given on the same command line become the default of their question, so `fastrnm ./photos --prefix holiday -w` only really asks about the rest. |
+| **A wrong answer is asked again** | A folder that does not exist or a reserved prefix is rejected on the spot; the four answers you already gave are not lost. |
+| **The default order is the creation date** | Unlike the flags, where `--sort name` is the default. Answering `2` or `name` restores it. |
+| **Ctrl+D cancels** | Nothing is renamed, and nothing is written. |
+
+The order question numbers are just shortcuts: `1` and `created` mean the same
+thing. `--wizard` needs a real terminal, so it cannot be combined with `--json`.
 
 ### Source and destination
 
@@ -258,6 +322,9 @@ than guessing, fastrnm stops and says so:
 | `--restart-per-folder` with `--flatten` | Restarting the count in every folder and then merging them guarantees duplicate names |
 | `--random` with `--start`, `--step` or `--pad` | Random names have no sequence; use `--random-length` |
 | `--random-length` without `--random` | Nothing to set the length of |
+| `--wizard` with `--json` | Questions need someone to answer them |
+| `--wizard` with `--undo` | Undoing takes no naming options |
+| `--wizard` with `--random` | The wizard builds a numbered sequence; `--random` replaces the numbers with tokens |
 
 ## Examples
 
