@@ -47,6 +47,7 @@ import {
   setColorEnabled,
 } from './src/output.js';
 import { validateAffix, validateNumbering, validateSeparator } from './src/validate.js';
+import { DEFAULT_SORT, formatCommand, runWizard } from './src/wizard.js';
 
 const PREVIEW_LIMIT = 40;
 const PROGRESS_THRESHOLD = 200;
@@ -78,6 +79,7 @@ const OPTIONS = {
   'keep-name': { type: 'boolean', default: false },
   reverse: { type: 'boolean', default: false },
   interactive: { type: 'boolean', default: false },
+  wizard: { type: 'boolean', short: 'w', default: false },
 
   ext: { type: 'string' },
   match: { type: 'string' },
@@ -102,6 +104,9 @@ ${color.bold('fastrnm')} -- bulk rename files to a numbered sequence
 
 ${color.bold('Usage')}
   fastrnm [folder] [options]
+
+${color.bold('Guided mode')}
+  -w, --wizard            Ask for folder, prefix, padding, separator and order
 
 ${color.bold('Source and destination')}
   [folder]                Folder to process (default: current folder)
@@ -148,6 +153,7 @@ ${color.bold('Output')}
   -v, --version           Show the version
 
 ${color.bold('Examples')}
+  fastrnm --wizard
   fastrnm ./photos --prefix holiday --pad 3 --dry-run
   fastrnm ./photos --output ./renamed --prefix holiday --create-dir
   fastrnm ./scans --random --output ./anonymous --create-dir
@@ -191,6 +197,33 @@ async function confirm(question, { defaultYes = false } = {}) {
   } finally {
     rl.close();
   }
+}
+
+/**
+ * A readline interface kept open for the whole wizard: one per question would
+ * lose the line editing and print a stray prompt on every step.
+ */
+function createPrompter() {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    throw new CliError(
+      '--wizard requires an interactive terminal.',
+      'Pass the options as flags instead, for example: fastrnm ./photos --prefix holiday --yes',
+    );
+  }
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return {
+    async ask(question) {
+      try {
+        return await rl.question(question);
+      } catch {
+        // Ctrl+D or a closed stdin: no answer means no run.
+        return null;
+      }
+    },
+    close() {
+      rl.close();
+    },
+  };
 }
 
 /** Interactive reordering: the user types the new order as a list of indexes. */
@@ -421,10 +454,76 @@ async function run(argv) {
   const json = values.json;
   const dryRun = values['dry-run'];
   const sourceInput = values.dir ?? positionals[0];
-  const { dir: source, explicit } = await resolveSource(sourceInput);
+
+  if (values.wizard) {
+    if (values.json) {
+      throw new CliError(
+        '--wizard asks questions, which --json cannot answer.',
+        'Pass the options as flags: fastrnm ./photos --prefix holiday --json --yes',
+      );
+    }
+    if (values.undo) {
+      throw new CliError(
+        '--wizard and --undo do different things.',
+        'Undoing takes no naming options: fastrnm ./photos --undo',
+      );
+    }
+    if (values.random) {
+      throw new CliError(
+        '--wizard and --random contradict each other.',
+        'The wizard builds a numbered sequence; --random replaces the numbers with tokens.',
+      );
+    }
+  }
+
+  let { dir: source, explicit } = await resolveSource(sourceInput);
 
   if (values.undo) {
     return runUndo(source, { json, yes: values.yes });
+  }
+
+  // Checked before the wizard runs: an unknown mode given as a flag would
+  // otherwise be offered as an answer and only rejected five questions later.
+  if (values.sort !== undefined && !SORT_MODES.includes(values.sort)) {
+    throw new CliError(
+      `unknown sort mode "${values.sort}".`,
+      `Valid values: ${SORT_MODES.join(', ')}.`,
+    );
+  }
+
+  // The wizard only collects options: it fills in the same values the flags
+  // would have set and the run continues through the usual path, preview and
+  // confirmation included.
+  if (values.wizard) {
+    const prompter = createPrompter();
+    let answers;
+    try {
+      answers = await runWizard({
+        ask: prompter.ask,
+        defaults: {
+          dir: sourceInput,
+          prefix: values.prefix,
+          pad: parseInteger(values.pad, '--pad'),
+          separator: values.separator ?? '_',
+          sort: values.sort ?? DEFAULT_SORT,
+        },
+      });
+    } finally {
+      prompter.close();
+    }
+
+    if (answers === null) {
+      process.stdout.write('\nNothing has been changed.\n');
+      return 0;
+    }
+
+    ({ dir: source, explicit } = answers.folder);
+    values.prefix = answers.prefix;
+    values.pad = answers.pad === undefined ? undefined : String(answers.pad);
+    values.separator = answers.separator;
+    values.sort = answers.sort;
+
+    process.stdout.write(`\n${color.gray(`Same run as: ${formatCommand(answers)}`)}\n`);
   }
 
   // --- option validation ------------------------------------------------
@@ -434,12 +533,6 @@ async function run(argv) {
   const pad = parseInteger(values.pad, '--pad');
   const sort = values.sort ?? 'name';
 
-  if (!SORT_MODES.includes(sort)) {
-    throw new CliError(
-      `unknown sort mode "${sort}".`,
-      `Valid values: ${SORT_MODES.join(', ')}.`,
-    );
-  }
   if (values.move && !values.output) {
     throw new CliError('--move only makes sense together with --output.');
   }

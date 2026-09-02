@@ -289,6 +289,33 @@ test('the current folder always asks, even with --yes', async () => {
   assert.deepEqual(await listFiles(dir), ['a.txt']);
 });
 
+test('the wizard needs a terminal to ask its questions', async () => {
+  const dir = await makeDir({ 'a.txt': 'a' });
+  const { code, stderr } = await run([dir, '--wizard']);
+
+  assert.equal(code, 1);
+  assert.match(stderr, /--wizard requires an interactive terminal/);
+  assert.deepEqual(await listFiles(dir), ['a.txt']);
+});
+
+test('the wizard refuses the flags that cannot answer or apply its questions', async () => {
+  const dir = await makeDir({ 'a.txt': 'a' });
+
+  const json = await run([dir, '--wizard', '--json']);
+  assert.equal(json.code, 1);
+  assert.match(JSON.parse(json.stdout).error, /--json cannot answer/);
+
+  const undo = await run([dir, '--wizard', '--undo']);
+  assert.equal(undo.code, 1);
+  assert.match(undo.stderr, /--wizard and --undo/);
+
+  const random = await run([dir, '--wizard', '--random']);
+  assert.equal(random.code, 1);
+  assert.match(random.stderr, /--wizard and --random/);
+
+  assert.deepEqual(await listFiles(dir), ['a.txt']);
+});
+
 test('a tilde path is expanded', () => {
   assert.equal(expandHome('~'), os.homedir());
   assert.equal(expandHome('~/photos'), path.join(os.homedir(), 'photos'));
