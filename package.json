@@ -1,0 +1,43 @@
+{
+  "name": "fastrnm",
+  "version": "0.1.0",
+  "description": "Bulk-rename the files of a folder to a numbered sequence, safely: preview, collision detection and undo.",
+  "keywords": [
+    "rename",
+    "bulk-rename",
+    "batch-rename",
+    "sequential",
+    "numbering",
+    "cli",
+    "files",
+    "undo"
+  ],
+  "homepage": "https://github.com/Rodrycode/fastrnm#readme",
+  "bugs": {
+    "url": "https://github.com/Rodrycode/fastrnm/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rodrycode/fastrnm.git"
+  },
+  "license": "MIT",
+  "author": "David Rodriguez",
+  "type": "module",
+  "bin": {
+    "fastrnm": "./index.js"
+  },
+  "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "index.js",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "prepublishOnly": "npm test"
+  }
+}
